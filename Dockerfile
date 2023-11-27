@@ -40,8 +40,6 @@ RUN mkdir -p /var/www/storage/framework/sessions
 RUN mkdir -p /var/www/storage/framework/views
 
 # Fix files ownership.
-RUN chown -R www-data:www-data /var/www \
-    && a2enmod rewrite
 RUN chown -R www-data /var/www/storage
 RUN chown -R www-data /var/www/storage/framework
 RUN chown -R www-data /var/www/storage/framework/sessions
