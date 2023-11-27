@@ -1,39 +1,62 @@
-# Pull php-apache image 
-FROM php:8.1-apache as php
+# Used for prod build.
+FROM php:8.1-fpm as php
 
 # use root user
 USER root 
 
-# Set working directory to the apache public directory 
-WORKDIR /var/www/html
+# Set environment variables
+ENV PHP_OPCACHE_ENABLE=1
+ENV PHP_OPCACHE_ENABLE_CLI=0
+ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=0
+ENV PHP_OPCACHE_REVALIDATE_FREQ=0
 
-# Copy all files into the apache public directory
-COPY . /var/www/html/
+# Install dependencies.
+RUN apt-get update && apt-get install -y unzip libpq-dev libcurl4-gnutls-dev nginx libonig-dev
 
-# Install the dependecies to run php
-RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    zlib1g-dev \
-    libxml2-dev \
-    libzip-dev \ 
-    zip \
-    curl \
-    unzip \
-    && docker-php-ext-configure gd \
-    && docker-php-ext-install -j$(nproc) gd \
-    && docker-php-ext-install pdo_mysql \
-    && docker-php-ext-install mysqli \
-    && docker-php-ext-install zip \
-    && docker-php-source delete
+# Install PHP extensions.
+RUN docker-php-ext-install mysqli pdo pdo_mysql bcmath curl opcache mbstring
+
+# Copy composer executable.
+COPY --from=composer:2.3.5 /usr/bin/composer /usr/bin/composer
+
+# Copy configuration files.
+COPY ./docker/php/php.ini /usr/local/etc/php/php.ini
+COPY ./docker/php/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
+COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
+
+# Set working directory to /var/www.
+WORKDIR /var/www
+
+# Copy files from current folder to container current folder (set in workdir).
+COPY --chown=www-data:www-data . .
 
 
-COPY ./vhost.conf /etc/apache2/sites-available/000-default.conf
 
-# Download php composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+# Create laravel caching folders.
+RUN mkdir -p /var/www/storage/framework
+RUN mkdir -p /var/www/storage/framework/cache
+RUN mkdir -p /var/www/storage/framework/testing
+RUN mkdir -p /var/www/storage/framework/sessions
+RUN mkdir -p /var/www/storage/framework/views
 
-RUN chown -R www-data:www-data /var/www/html \
+# Fix files ownership.
+RUN chown -R www-data:www-data /var/www \
     && a2enmod rewrite
+RUN chown -R www-data /var/www/storage
+RUN chown -R www-data /var/www/storage/framework
+RUN chown -R www-data /var/www/storage/framework/sessions
+
+# Set correct permission.
+
+RUN chmod -R 755 /var/www/storage
+RUN chmod -R 755 /var/www/storage/logs
+RUN chmod -R 755 /var/www/storage/framework
+RUN chmod -R 755 /var/www/storage/framework/sessions
+RUN chmod -R 755 /var/www/bootstrap
+
+# Adjust user permission & group
+RUN usermod --uid 1000 www-data
+RUN groupmod --gid 1001 www-data
 
 # Run the entrypoint file.
 ENTRYPOINT [ "docker/entrypoint.sh" ]
