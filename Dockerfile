@@ -27,9 +27,9 @@ WORKDIR /var/www
 # Copy files from current folder to container current folder (set in workdir).
 # COPY --chown=www-data:www-data . .
 
-COPY --chown=www:www . /var/www
+COPY --chown=www:www . .
 
-USER www
+
 
 # Create laravel caching folders.
 RUN mkdir -p /var/www/storage/framework
